@@ -164,15 +164,41 @@ apply_inline_patch() {
 
 download() {
     # download url [filename[dirname]]
-
+    # download url1 url2 ... [filename[dirname]]
     DOWNLOAD_PATH="$PACKAGES"
-    DOWNLOAD_FILE="${2:-"${1##*/}"}"
+    DOWNLOAD_URLS=()
+    DOWNLOAD_FILE=""
+    DOWNLOAD_DIR=""
+
+    for ARG in "$@"; do
+        case "$ARG" in
+        http://* | https://* | ftp://*)
+            DOWNLOAD_URLS+=("$ARG")
+            ;;
+        *)
+            if [ -z "$DOWNLOAD_FILE" ]; then
+                DOWNLOAD_FILE="$ARG"
+            elif [ -z "$DOWNLOAD_DIR" ]; then
+                DOWNLOAD_DIR="$ARG"
+            fi
+            ;;
+        esac
+    done
+
+    if [ "${#DOWNLOAD_URLS[@]}" -eq 0 ]; then
+        echo "No download URL supplied." >&2
+        exit 1
+    fi
+
+    if [ -z "$DOWNLOAD_FILE" ]; then
+        DOWNLOAD_FILE="${DOWNLOAD_URLS[0]##*/}"
+    fi
 
     if [[ "$DOWNLOAD_FILE" =~ tar. ]]; then
         TARGETDIR="${DOWNLOAD_FILE%.*}"
-        TARGETDIR="${3:-"${TARGETDIR%.*}"}"
+        TARGETDIR="${DOWNLOAD_DIR:-"${TARGETDIR%.*}"}"
     else
-        TARGETDIR="${3:-"${DOWNLOAD_FILE%.*}"}"
+        TARGETDIR="${DOWNLOAD_DIR:-"${DOWNLOAD_FILE%.*}"}"
     fi
 
     # The expected checksum is keyed off the package currently being built, which
@@ -181,22 +207,36 @@ download() {
     DOWNLOAD_SHA_VAR=$(package_sha_var "$CURRENT_PACKAGE_NAME")
     DOWNLOAD_SHA="${!DOWNLOAD_SHA_VAR}"
 
-    if [ ! -f "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ] || [ ! -s "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ]; then
-        echo "Downloading $1 as $DOWNLOAD_FILE"
-
-        if ! download_with_retries "$1" "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
-            echo "Failed to download $1 after $((DOWNLOAD_MAX_RETRIES + 1)) attempts."
-            exit 1
-        fi
-
-        echo "... Done"
-    else
+    DOWNLOAD_FILE_NEEDS_DOWNLOAD=0
+    if [ -f "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ] && [ -s "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ]; then
         echo "$DOWNLOAD_FILE has already been downloaded and is not empty."
         # A cached file is never deleted automatically: it may be a deliberately
         # placed local copy, and removing it would also destroy the evidence.
         if ! verify_checksum "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
             echo "The cached file $DOWNLOAD_PATH/$DOWNLOAD_FILE is corrupt or does not match the pinned version." >&2
             echo "Delete it and run the build again to download it anew." >&2
+            exit 1
+        fi
+    else
+        DOWNLOAD_FILE_NEEDS_DOWNLOAD=1
+    fi
+
+    if [ "$DOWNLOAD_FILE_NEEDS_DOWNLOAD" -eq 1 ]; then
+        DOWNLOAD_OK=0
+        for DOWNLOAD_URL in "${DOWNLOAD_URLS[@]}"; do
+            echo "Downloading $DOWNLOAD_URL as $DOWNLOAD_FILE"
+            if download_with_retries "$DOWNLOAD_URL" "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
+                DOWNLOAD_OK=1
+                echo "... Done"
+                break
+            fi
+
+            echo "Failed to download $DOWNLOAD_URL after $((DOWNLOAD_MAX_RETRIES + 1)) attempts."
+            rm -f "$DOWNLOAD_PATH/$DOWNLOAD_FILE"
+        done
+
+        if [ "$DOWNLOAD_OK" -ne 1 ]; then
+            echo "Failed to download all configured sources for $DOWNLOAD_FILE."
             exit 1
         fi
     fi
@@ -207,7 +247,7 @@ download() {
         return
     fi
 
-    if [ -n "$3" ]; then
+    if [ -n "$DOWNLOAD_DIR" ]; then
         if ! tar -xvf "$DOWNLOAD_PATH/$DOWNLOAD_FILE" -C "$DOWNLOAD_PATH/$TARGETDIR" 2>/dev/null >/dev/null; then
             echo "Failed to extract $DOWNLOAD_FILE"
             exit 1

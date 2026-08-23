@@ -35,7 +35,11 @@ build_gettext() {
     if ! $NONFREE_AND_GPL; then return; fi
 
     if build "gettext" "${VER_GETTEXT[0]}"; then
-        download "https://ftp.gnu.org/gnu/gettext/gettext-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/gettext/gettext-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/gettext/gettext-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}" --enable-static --disable-shared
         execute make -j "$MJOBS"
         execute make install
@@ -62,7 +66,11 @@ build_gmp() {
     if [ "$TLS_BACKEND" != "gnutls" ]; then return; fi
 
     if build "gmp" "${VER_GMP[0]}" "$MACOS_INTEL_BUILD_VARIANT"; then
-        download "https://ftp.gnu.org/gnu/gmp/gmp-$CURRENT_PACKAGE_VERSION.tar.xz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/gmp/gmp-$CURRENT_PACKAGE_VERSION.tar.xz"
+            "https://ftpmirror.gnu.org/gnu/gmp/gmp-$CURRENT_PACKAGE_VERSION.tar.xz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         # GMP's compiler probe calls "void g(){}" with six arguments. C23 made an empty
         # parameter list mean (void), so GCC 15 rejects the call and configure concludes
         # there is no working compiler at all. See pre_c23_cflag. The standard goes on CC
@@ -91,7 +99,11 @@ build_nettle() {
     if [ "$TLS_BACKEND" != "gnutls" ]; then return; fi
 
     if build "nettle" "${VER_NETTLE[0]}"; then
-        download "https://ftp.gnu.org/gnu/nettle/nettle-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/nettle/nettle-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/nettle/nettle-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}" --disable-shared --enable-static --disable-openssl --disable-documentation --libdir="${WORKSPACE}"/lib CPPFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}"
         execute make -j "$MJOBS"
         execute make install

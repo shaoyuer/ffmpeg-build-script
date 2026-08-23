@@ -22,7 +22,11 @@ build_giflib() {
 
 build_pkg_config() {
     if build "pkg-config" "${VER_PKG_CONFIG[0]}"; then
-        download "https://pkgconfig.freedesktop.org/releases/pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://pkgconfig.freedesktop.org/releases/pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://github.com/pkg-config/pkg-config/releases/download/pkg-config-$CURRENT_PACKAGE_VERSION/pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
             CFLAGS+=" -Wno-int-conversion" # pkg-config 0.29.2 has a warning that is treated as an error
             CFLAGS+=" -Wno-error=int-conversion"
@@ -158,7 +162,11 @@ build_bzip2() {
 
 build_m4() {
     if build "m4" "${VER_M4[0]}"; then
-        download "https://ftp.gnu.org/gnu/m4/m4-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/m4/m4-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/m4/m4-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}"
         execute make -j "$MJOBS"
         execute make install
@@ -168,7 +176,11 @@ build_m4() {
 
 build_autoconf() {
     if build "autoconf" "${VER_AUTOCONF[0]}"; then
-        download "https://ftp.gnu.org/gnu/autoconf/autoconf-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/autoconf/autoconf-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/autoconf/autoconf-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}"
         execute make -j "$MJOBS"
         execute make install
@@ -178,7 +190,11 @@ build_autoconf() {
 
 build_automake() {
     if build "automake" "${VER_AUTOMAKE[0]}"; then
-        download "https://ftp.gnu.org/gnu/automake/automake-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/automake/automake-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/automake/automake-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}"
         execute make -j "$MJOBS"
         execute make install
@@ -188,7 +204,11 @@ build_automake() {
 
 build_libtool() {
     if build "libtool" "${VER_LIBTOOL[0]}"; then
-        download "https://ftp.gnu.org/gnu/libtool/libtool-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/libtool/libtool-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/libtool/libtool-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}" --enable-static --disable-shared
         execute make -j "$MJOBS"
         execute make install
