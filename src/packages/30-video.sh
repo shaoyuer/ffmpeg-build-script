@@ -504,11 +504,16 @@ build_av1() {
         download "${AV1_DOWNLOAD_SOURCES[@]}" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
 
         AOM_SOURCE_DIR="$PACKAGES/av1"
+        # The official release tarball extracts as libaom-<version>/, while the googlesource
+        # fallback may either add a top-level directory or unpack the repository contents
+        # directly into av1/ (which itself contains a nested aom/ source subdirectory). Pick
+        # the first directory that is an actual CMake project root rather than any directory
+        # that merely happens to exist.
         for av1_candidate in \
             "$PACKAGES/av1/libaom-$CURRENT_PACKAGE_VERSION" \
             "$PACKAGES/av1/aom" \
             "$PACKAGES/av1/aom-$CURRENT_PACKAGE_VERSION"; do
-            if [ -d "$av1_candidate" ]; then
+            if [ -f "$av1_candidate/CMakeLists.txt" ]; then
                 AOM_SOURCE_DIR="$av1_candidate"
                 break
             fi
