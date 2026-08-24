@@ -22,11 +22,13 @@ build_giflib() {
 
 build_pkg_config() {
     if build "pkg-config" "${VER_PKG_CONFIG[0]}"; then
-        DOWNLOAD_SOURCES=(
-            "https://pkgconfig.freedesktop.org/releases/pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
-            "https://github.com/pkg-config/pkg-config/releases/download/pkg-config-$CURRENT_PACKAGE_VERSION/pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
-        )
-        download "${DOWNLOAD_SOURCES[@]}"
+        # pkgconfig.freedesktop.org no longer serves the 0.29.2 release tarball, and the
+        # pkg-config GitHub mirror does not publish a matching release asset. Debian's
+        # .orig tarball is byte-identical to the upstream release archive, including its
+        # checksum, so it is a stable source for the pinned 0.29.2 tarball.
+        download \
+            "https://deb.debian.org/debian/pool/main/p/pkg-config/pkg-config_$CURRENT_PACKAGE_VERSION.orig.tar.gz" \
+            "pkg-config-$CURRENT_PACKAGE_VERSION.tar.gz"
         if [[ "$OSTYPE" == "darwin"* ]]; then
             CFLAGS+=" -Wno-int-conversion" # pkg-config 0.29.2 has a warning that is treated as an error
             CFLAGS+=" -Wno-error=int-conversion"
