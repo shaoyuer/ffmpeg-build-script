@@ -497,12 +497,34 @@ build_frei0r() {
 
 build_av1() {
     if build "av1" "${VER_AV1[0]}"; then
-        download "https://storage.googleapis.com/aom-releases/libaom-$CURRENT_PACKAGE_VERSION.tar.gz" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
+        OFFICIAL_AV1_URL="https://storage.googleapis.com/aom-releases/libaom-$CURRENT_PACKAGE_VERSION.tar.gz"
+        LEGACY_AV1_URL="https://aomedia.googlesource.com/aom/+archive/refs/tags/v$CURRENT_PACKAGE_VERSION.tar.gz"
+        AV1_ARCHIVE="$PACKAGES/av1-$CURRENT_PACKAGE_VERSION.tar.gz"
+
+        if ! download_with_retries "$OFFICIAL_AV1_URL" "$AV1_ARCHIVE" "${VER_AV1[1]}"; then
+            echo "Official libaom release tarball unavailable; trying the legacy googlesource source."
+            if ! download_with_retries "$LEGACY_AV1_URL" "$AV1_ARCHIVE" ""; then
+                echo "Failed to download all configured sources for $AV1_ARCHIVE."
+                exit 1
+            fi
+        fi
+
+        make_dir "$PACKAGES/av1"
+        if ! tar -xvf "$AV1_ARCHIVE" -C "$PACKAGES/av1" 2>/dev/null >/dev/null; then
+            echo "Failed to extract $AV1_ARCHIVE"
+            exit 1
+        fi
 
         AOM_SOURCE_DIR="$PACKAGES/av1"
-        if [ -d "$AOM_SOURCE_DIR/libaom-$CURRENT_PACKAGE_VERSION" ]; then
-            AOM_SOURCE_DIR="$AOM_SOURCE_DIR/libaom-$CURRENT_PACKAGE_VERSION"
-        fi
+        for av1_candidate in \
+            "$PACKAGES/av1/libaom-$CURRENT_PACKAGE_VERSION" \
+            "$PACKAGES/av1/aom" \
+            "$PACKAGES/av1/aom-$CURRENT_PACKAGE_VERSION"; do
+            if [ -d "$av1_candidate" ]; then
+                AOM_SOURCE_DIR="$av1_candidate"
+                break
+            fi
+        done
 
         make_dir "$PACKAGES"/aom_build
         cd "$PACKAGES"/aom_build || exit
