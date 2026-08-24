@@ -497,13 +497,34 @@ build_frei0r() {
 
 build_av1() {
     if build "av1" "${VER_AV1[0]}"; then
-        download "https://aomedia.googlesource.com/aom/+archive/refs/tags/v$CURRENT_PACKAGE_VERSION.tar.gz" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
+        AV1_DOWNLOAD_SOURCES=(
+            "https://storage.googleapis.com/aom-releases/libaom-$CURRENT_PACKAGE_VERSION.tar.gz|${VER_AV1[1]}"
+            "https://aomedia.googlesource.com/aom/+archive/refs/tags/v$CURRENT_PACKAGE_VERSION.tar.gz|"
+        )
+        download "${AV1_DOWNLOAD_SOURCES[@]}" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
+
+        AOM_SOURCE_DIR="$PACKAGES/av1"
+        # The official release tarball extracts as libaom-<version>/, while the googlesource
+        # fallback may either add a top-level directory or unpack the repository contents
+        # directly into av1/ (which itself contains a nested aom/ source subdirectory). Pick
+        # the first directory that is an actual CMake project root rather than any directory
+        # that merely happens to exist.
+        for av1_candidate in \
+            "$PACKAGES/av1/libaom-$CURRENT_PACKAGE_VERSION" \
+            "$PACKAGES/av1/aom" \
+            "$PACKAGES/av1/aom-$CURRENT_PACKAGE_VERSION"; do
+            if [ -f "$av1_candidate/CMakeLists.txt" ]; then
+                AOM_SOURCE_DIR="$av1_candidate"
+                break
+            fi
+        done
+
         make_dir "$PACKAGES"/aom_build
         cd "$PACKAGES"/aom_build || exit
         if $MACOS_SILICON; then
-            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCONFIG_RUNTIME_CPU_DETECT=0 "$PACKAGES"/av1
+            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCONFIG_RUNTIME_CPU_DETECT=0 "$AOM_SOURCE_DIR"
         else
-            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib "$PACKAGES"/av1
+            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib "$AOM_SOURCE_DIR"
         fi
         execute make -j "$MJOBS"
         execute make install

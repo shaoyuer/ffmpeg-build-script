@@ -64,9 +64,9 @@ VER_VID_STAB=("1.1.2" "96db34d48a9e3aa13736a48744b56dfb76731ac9bb5193c716de8534c
 # Homebrew patch that vid_stab needs on Apple Silicon, pinned by URL to a commit.
 VER_VID_STAB_PATCH=("" "45c16a2b64ba67f7ca5335c2f602d8d5186c29b38188b3cc7aff5df60aecaf60")
 VER_FREI0R=("3.2.3" "898f80e5fdae6108a2d9b2317649af576a4b5e636c73429ee11b64397a596e12")
-# av1 cannot be pinned: googlesource.com's +archive endpoint regenerates the
-# tarball on every request with different bytes, so no hash is ever stable.
-VER_AV1=("3.14.1" "")
+# The official AOM release tarball is published at a stable storage URL and is
+# checksum-pinned like every other package in the script.
+VER_AV1=("3.14.1" "44bf90dbd23e734d50e70a8c41c285193922938bd0d3bc2ee56764d181d55ef5")
 VER_ZIMG=("3.0.6" "be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577")
 VER_LIBVMAF=("3.2.0" "a28f93f3b4fa65601be324587072e32a6a704a304ba7b1aec9b70b3f709bc1dc")
 

@@ -52,7 +52,11 @@ build_gperf() {
     # fontconfig generates fcgenericfamily.h with gperf, which is not shipped in the tarball.
     # macOS has gperf in /usr/bin, but a minimal Linux install usually does not, so build it here.
     if build "gperf" "${VER_GPERF[0]}"; then
-        download "https://ftp.gnu.org/gnu/gperf/gperf-$CURRENT_PACKAGE_VERSION.tar.gz"
+        DOWNLOAD_SOURCES=(
+            "https://ftp.gnu.org/gnu/gperf/gperf-$CURRENT_PACKAGE_VERSION.tar.gz"
+            "https://ftpmirror.gnu.org/gnu/gperf/gperf-$CURRENT_PACKAGE_VERSION.tar.gz"
+        )
+        download "${DOWNLOAD_SOURCES[@]}"
         execute ./configure --prefix="${WORKSPACE}"
         execute make -j "$MJOBS"
         execute make install
