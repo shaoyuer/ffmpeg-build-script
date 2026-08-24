@@ -326,6 +326,8 @@ execute() {
         echo "$OUTPUT"
         echo ""
         echo "Failed to Execute $*" >&2
+        # shellcheck disable=SC2034 # read by report_failure() in this fragment
+        LAST_FAILED_COMMAND="$*"
         exit 1
     fi
 }
@@ -449,6 +451,131 @@ cleanup() {
     echo ""
 }
 
+##
+## Build log and failure report
+##
+
+# The state of the log mirror and of the exit handling. Written here and in
+# start_build_logging(), read by stop_build_logging()/on_exit()/report_failure()
+# in this fragment and by the trap lines in the entry point.
+# shellcheck disable=SC2034 # read by report_failure() and stop_build_logging()
+BUILD_LOG=""
+# shellcheck disable=SC2034 # read by stop_build_logging()
+BUILD_LOG_FIFO_DIR=""
+# shellcheck disable=SC2034 # read by stop_build_logging()
+BUILD_TEE_PID=""
+# shellcheck disable=SC2034 # set by the entry point's INT/TERM traps, read by on_exit()
+USER_INTERRUPTED=false
+# shellcheck disable=SC2034 # appended by do_update(), read by on_exit()
+EXIT_CLEANUP_DIRS=""
+
+start_build_logging() {
+    # Mirrors everything the script prints into $CWD/build.log while keeping it
+    # on the terminal: tee holds both ends. A FIFO rather than process
+    # substitution, so stop_build_logging() can drain it deterministically -
+    # "exec > >(tee ...) 2>&1" can lose its last lines, because bash exits
+    # without waiting for the tee behind the redirection and the failure report
+    # would be exactly those last lines.
+    BUILD_LOG="$CWD/build.log"
+    BUILD_LOG_FIFO_DIR=$(mktemp -d) || return 0
+    if ! mkfifo "$BUILD_LOG_FIFO_DIR/log.fifo"; then
+        rm -rf "$BUILD_LOG_FIFO_DIR"
+        BUILD_LOG_FIFO_DIR=""
+        return 0
+    fi
+    tee "$BUILD_LOG" <"$BUILD_LOG_FIFO_DIR/log.fifo" &
+    BUILD_TEE_PID=$!
+    exec >"$BUILD_LOG_FIFO_DIR/log.fifo" 2>&1
+}
+
+stop_build_logging() {
+    if [ -z "$BUILD_TEE_PID" ]; then
+        return
+    fi
+    # Closing both fds ends tee's input, so waiting for it guarantees the log
+    # holds everything up to and including what was printed just before this.
+    exec >&- 2>&-
+    wait "$BUILD_TEE_PID"
+    rm -rf "$BUILD_LOG_FIFO_DIR"
+    BUILD_TEE_PID=""
+}
+
+# One line naming the OS release, for the copy-paste block in report_failure().
+os_display_name() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        printf 'macOS %s' "$(sw_vers -productVersion 2>/dev/null)"
+    elif [ -r "/etc/os-release" ]; then
+        sed -n 's/^PRETTY_NAME="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release | head -n 1
+    else
+        uname -s
+    fi
+}
+
+report_failure() {
+    echo ""
+    echo "========================================================================"
+    echo "The build failed."
+    if [ -n "$CURRENT_PACKAGE_NAME" ]; then
+        echo "Package being built: $CURRENT_PACKAGE_NAME $CURRENT_PACKAGE_VERSION"
+    fi
+    if [ -n "$LAST_FAILED_COMMAND" ]; then
+        echo "Failed step: $LAST_FAILED_COMMAND"
+    fi
+    echo ""
+    echo "Please open an issue at https://github.com/markus-perl/ffmpeg-build-script/issues"
+    echo "and include everything between the lines below plus the full build log:"
+    echo "$BUILD_LOG"
+    echo ""
+    echo "-------------------- copy from here --------------------"
+    echo "script:   ffmpeg-build-script v$SCRIPT_VERSION (FFmpeg $FFMPEG_VERSION)"
+    echo "invoked:  $PROGNAME $INVOCATION_ARGS"
+    echo "os:       $(os_display_name)"
+    echo "kernel:   $(uname -sr)"
+    echo "arch:     $(uname -m)"
+    echo "compiler: $("${CC:-cc}" --version 2>/dev/null | head -n 1)"
+    echo "jobs:     $MJOBS"
+    if $NONFREE_AND_GPL; then
+        echo "license:  GPL and non-free"
+    else
+        echo "license:  LGPL (default)"
+    fi
+    echo "tls:      $TLS_BACKEND"
+    if [ -n "$WHISPER_BACKEND" ]; then
+        echo "whisper:  $WHISPER_BACKEND"
+    fi
+    if [ -n "$LDEXEFLAGS" ]; then
+        echo "mode:     full static"
+    fi
+    echo "--------------------- copy to here ---------------------"
+}
+
+# Single EXIT handler for every way the script can end: normal completion, a
+# failed build step, Ctrl+C. The entry point installs it with "trap on_exit
+# EXIT", so no fragment may set its own EXIT trap afterwards - it would replace
+# this one, losing the .git restore and the log teardown. do_update() hands its
+# temp dir to EXIT_CLEANUP_DIRS for the same reason.
+on_exit() {
+    EXIT_STATUS=$?
+    # Restore .git even when the build fails and exits early; see 95-ffmpeg.sh.
+    if [ -d "$CWD/.git.bak" ]; then
+        mv "$CWD/.git.bak" "$CWD/.git"
+    fi
+    # shellcheck disable=SC2086 # deliberate word splitting over whitespace-separated dirs
+    for EXIT_DIR in $EXIT_CLEANUP_DIRS; do
+        rm -rf "$EXIT_DIR"
+    done
+    # The bug-report hint is only for genuine failures of a supported build:
+    # an interrupted run was stopped deliberately, and an unpinned FFmpeg
+    # (snapshot, --ffmpeg-version) is a combination the pinned library versions
+    # were never tested against - 40-cli.sh already tells those users to retry
+    # with the pinned version before reporting anything.
+    if [ "$EXIT_STATUS" -ne 0 ] && ! $USER_INTERRUPTED && ! $FFMPEG_UNPINNED; then
+        report_failure
+    fi
+    stop_build_logging
+    return "$EXIT_STATUS"
+}
+
 # Is $1 an older version than $2? Used only to recognize a tree that is ahead of
 # the newest release, so a wrong answer costs a warning and nothing else. Hosts
 # whose sort has no -V fall back to "not older", which reduces the check to the
@@ -538,7 +665,11 @@ do_update() {
         return 1
     fi
 
-    trap 'rm -rf "$UPDATE_TMP"' EXIT
+    # Removed by on_exit() rather than through a trap of its own: setting an
+    # EXIT trap here would replace the entry point's, losing the .git restore,
+    # the failure report and the log teardown.
+    # shellcheck disable=SC2034 # read by on_exit() in this fragment
+    EXIT_CLEANUP_DIRS+=" $UPDATE_TMP"
 
     if ! curl -fsSL -o "$UPDATE_TMP/release.tar.gz" "$UPDATE_REPO/archive/refs/tags/$UPDATE_TAG.tar.gz"; then
         echo "Failed to download $UPDATE_REPO/archive/refs/tags/$UPDATE_TAG.tar.gz" >&2

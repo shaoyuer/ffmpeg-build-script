@@ -1,5 +1,6 @@
 /packages
 /workspace
+/build.log
 .idea
 /linux
 /.artifacts

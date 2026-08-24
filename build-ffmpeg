@@ -84,6 +84,19 @@ fragment_failed() {
 . "$SCRIPT_DIR/src/20-globals.sh" || fragment_failed 20-globals.sh
 # shellcheck source=src/30-helpers.sh
 . "$SCRIPT_DIR/src/30-helpers.sh" || fragment_failed 30-helpers.sh
+
+# From here on everything the script prints is mirrored into $CWD/build.log:
+# start_build_logging() tees stdout and stderr, so the terminal keeps showing
+# the live build output while a full copy accumulates in the file for a bug
+# report. The traps funnel every way this script can stop - normal exit, a
+# failed build step, Ctrl+C - into on_exit(), which restores .git, removes the
+# temp dirs registered in EXIT_CLEANUP_DIRS and, for a genuine build failure,
+# tells the user where to report it.
+INVOCATION_ARGS="$*"
+trap on_exit EXIT
+trap 'USER_INTERRUPTED=true; exit 130' INT
+trap 'USER_INTERRUPTED=true; exit 143' TERM
+start_build_logging
 # shellcheck source=src/40-cli.sh
 . "$SCRIPT_DIR/src/40-cli.sh" || fragment_failed 40-cli.sh
 

@@ -19,8 +19,8 @@ fi
 if [ -d "$CWD/.git" ]; then
     echo -e "\nTemporarily moving .git dir to .git.bak to workaround ffmpeg build bug" #causing ffmpeg version number to be wrong
     mv "$CWD/.git" "$CWD/.git.bak"
-    # Restore .git even if the build fails and exits early.
-    trap 'if [ -d "$CWD/.git.bak" ]; then mv "$CWD/.git.bak" "$CWD/.git"; fi' EXIT
+    # Restored even when the build fails and exits early - by on_exit() in
+    # 30-helpers.sh, which the entry point has installed as the EXIT trap.
 fi
 
 # Unlike every dependency above, ffmpeg deliberately takes part in none of the
