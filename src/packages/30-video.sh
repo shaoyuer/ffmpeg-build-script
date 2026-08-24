@@ -497,13 +497,19 @@ build_frei0r() {
 
 build_av1() {
     if build "av1" "${VER_AV1[0]}"; then
-        download "https://aomedia.googlesource.com/aom/+archive/refs/tags/v$CURRENT_PACKAGE_VERSION.tar.gz" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
+        download "https://storage.googleapis.com/aom-releases/libaom-$CURRENT_PACKAGE_VERSION.tar.gz" "av1-$CURRENT_PACKAGE_VERSION.tar.gz" "av1"
+
+        AOM_SOURCE_DIR="$PACKAGES/av1"
+        if [ -d "$AOM_SOURCE_DIR/libaom-$CURRENT_PACKAGE_VERSION" ]; then
+            AOM_SOURCE_DIR="$AOM_SOURCE_DIR/libaom-$CURRENT_PACKAGE_VERSION"
+        fi
+
         make_dir "$PACKAGES"/aom_build
         cd "$PACKAGES"/aom_build || exit
         if $MACOS_SILICON; then
-            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCONFIG_RUNTIME_CPU_DETECT=0 "$PACKAGES"/av1
+            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCONFIG_RUNTIME_CPU_DETECT=0 "$AOM_SOURCE_DIR"
         else
-            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib "$PACKAGES"/av1
+            execute cmake -DENABLE_TESTS=0 -DENABLE_EXAMPLES=0 -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib "$AOM_SOURCE_DIR"
         fi
         execute make -j "$MJOBS"
         execute make install
