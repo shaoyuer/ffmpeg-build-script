@@ -164,16 +164,25 @@ apply_inline_patch() {
 
 download() {
     # download url [filename[dirname]]
-    # download url1 url2 ... [filename[dirname]]
+    # download url1[|sha256] url2[|sha256] ... [filename[dirname]]
     DOWNLOAD_PATH="$PACKAGES"
     DOWNLOAD_URLS=()
+    DOWNLOAD_SHAS=()
+    DOWNLOAD_SHA_EXPLICIT=()
     DOWNLOAD_FILE=""
     DOWNLOAD_DIR=""
 
     for ARG in "$@"; do
         case "$ARG" in
         http://* | https://* | ftp://*)
-            DOWNLOAD_URLS+=("$ARG")
+            DOWNLOAD_URLS+=("${ARG%%|*}")
+            if [[ "$ARG" == *"|"* ]]; then
+                DOWNLOAD_SHAS+=("${ARG#*|}")
+                DOWNLOAD_SHA_EXPLICIT+=(1)
+            else
+                DOWNLOAD_SHAS+=("")
+                DOWNLOAD_SHA_EXPLICIT+=(0)
+            fi
             ;;
         *)
             if [ -z "$DOWNLOAD_FILE" ]; then
@@ -201,18 +210,29 @@ download() {
         TARGETDIR="${DOWNLOAD_DIR:-"${DOWNLOAD_FILE%.*}"}"
     fi
 
-    # The expected checksum is keyed off the package currently being built, which
-    # build() records in CURRENT_PACKAGE_NAME. An unset or empty checksum element
-    # means the package is not pinned yet and verification is skipped.
+    # A source-specific checksum takes precedence. Plain URLs use the package
+    # checksum, which keeps the existing single-checksum API unchanged.
     DOWNLOAD_SHA_VAR=$(package_sha_var "$CURRENT_PACKAGE_NAME")
-    DOWNLOAD_SHA="${!DOWNLOAD_SHA_VAR}"
+    DOWNLOAD_PACKAGE_SHA="${!DOWNLOAD_SHA_VAR}"
 
     DOWNLOAD_FILE_NEEDS_DOWNLOAD=0
     if [ -f "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ] && [ -s "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ]; then
         echo "$DOWNLOAD_FILE has already been downloaded and is not empty."
         # A cached file is never deleted automatically: it may be a deliberately
         # placed local copy, and removing it would also destroy the evidence.
-        if ! verify_checksum "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
+        DOWNLOAD_CACHE_VALID=0
+        for DOWNLOAD_INDEX in "${!DOWNLOAD_URLS[@]}"; do
+            if [ "${DOWNLOAD_SHA_EXPLICIT[$DOWNLOAD_INDEX]}" -eq 1 ]; then
+                DOWNLOAD_SHA="${DOWNLOAD_SHAS[$DOWNLOAD_INDEX]}"
+            else
+                DOWNLOAD_SHA="$DOWNLOAD_PACKAGE_SHA"
+            fi
+            if [ -z "$DOWNLOAD_SHA" ] || verify_checksum "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
+                DOWNLOAD_CACHE_VALID=1
+                break
+            fi
+        done
+        if [ "$DOWNLOAD_CACHE_VALID" -ne 1 ]; then
             echo "The cached file $DOWNLOAD_PATH/$DOWNLOAD_FILE is corrupt or does not match the pinned version." >&2
             echo "Delete it and run the build again to download it anew." >&2
             exit 1
@@ -223,7 +243,13 @@ download() {
 
     if [ "$DOWNLOAD_FILE_NEEDS_DOWNLOAD" -eq 1 ]; then
         DOWNLOAD_OK=0
-        for DOWNLOAD_URL in "${DOWNLOAD_URLS[@]}"; do
+        for DOWNLOAD_INDEX in "${!DOWNLOAD_URLS[@]}"; do
+            DOWNLOAD_URL="${DOWNLOAD_URLS[$DOWNLOAD_INDEX]}"
+            if [ "${DOWNLOAD_SHA_EXPLICIT[$DOWNLOAD_INDEX]}" -eq 1 ]; then
+                DOWNLOAD_SHA="${DOWNLOAD_SHAS[$DOWNLOAD_INDEX]}"
+            else
+                DOWNLOAD_SHA="$DOWNLOAD_PACKAGE_SHA"
+            fi
             echo "Downloading $DOWNLOAD_URL as $DOWNLOAD_FILE"
             if download_with_retries "$DOWNLOAD_URL" "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
                 DOWNLOAD_OK=1
