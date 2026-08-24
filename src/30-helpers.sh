@@ -221,17 +221,31 @@ download() {
         # A cached file is never deleted automatically: it may be a deliberately
         # placed local copy, and removing it would also destroy the evidence.
         DOWNLOAD_CACHE_VALID=0
+        DOWNLOAD_CACHE_SHA_AVAILABLE=0
         for DOWNLOAD_INDEX in "${!DOWNLOAD_URLS[@]}"; do
             if [ "${DOWNLOAD_SHA_EXPLICIT[$DOWNLOAD_INDEX]}" -eq 1 ]; then
                 DOWNLOAD_SHA="${DOWNLOAD_SHAS[$DOWNLOAD_INDEX]}"
             else
                 DOWNLOAD_SHA="$DOWNLOAD_PACKAGE_SHA"
             fi
-            if [ -z "$DOWNLOAD_SHA" ] || verify_checksum "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
+
+            # An unpinned fallback source says nothing about whether a cached file matches the
+            # pinned primary source, so it cannot make the cache "valid" by itself. Only an
+            # actual checksum match counts; when no source has a checksum at all, fall back to
+            # the historical "cached and non-empty is good enough" behaviour below.
+            if [ -z "$DOWNLOAD_SHA" ]; then
+                continue
+            fi
+
+            DOWNLOAD_CACHE_SHA_AVAILABLE=1
+            if verify_checksum "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$DOWNLOAD_SHA"; then
                 DOWNLOAD_CACHE_VALID=1
                 break
             fi
         done
+        if [ "$DOWNLOAD_CACHE_VALID" -ne 1 ] && [ "$DOWNLOAD_CACHE_SHA_AVAILABLE" -eq 0 ]; then
+            DOWNLOAD_CACHE_VALID=1
+        fi
         if [ "$DOWNLOAD_CACHE_VALID" -ne 1 ]; then
             echo "The cached file $DOWNLOAD_PATH/$DOWNLOAD_FILE is corrupt or does not match the pinned version." >&2
             echo "Delete it and run the build again to download it anew." >&2
