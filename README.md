@@ -346,8 +346,8 @@ Options:
       --enable-gpl-and-non-free  Enable GPL and non-free codecs  - https://ffmpeg.org/legal.html
       --disable=NAME[,NAME...]   Do not build these libraries. Repeatable.
                                  --list-packages shows every name that can be disabled.
-      --ffmpeg-version=VERSION   Build this FFmpeg release instead of the pinned 9.0.1.
-                                 VERSION is a release number (e.g. 9.0.1), "latest",
+      --ffmpeg-version=VERSION   Build this FFmpeg release instead of the pinned 9.0.2.
+                                 VERSION is a release number (e.g. 9.0.2), "latest",
                                  or "snapshot" for the current FFmpeg master.
                                  Release versions are looked up at https://ffmpeg.org/releases/.
                                  Only the pinned version is verified against a checksum
@@ -375,7 +375,7 @@ rebuilt automatically on the next build.
 
 ## Choosing the FFmpeg version
 
-The script builds one pinned FFmpeg release, currently 9.0.1, whose tarball is verified
+The script builds one pinned FFmpeg release, currently 9.0.2, whose tarball is verified
 against a checksum. `--ffmpeg-version` overrides that:
 
 ```bash

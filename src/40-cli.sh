@@ -11,7 +11,7 @@ usage() {
     echo "      --disable=NAME[,NAME...]   Do not build these libraries. Repeatable."
     echo "                                 --list-packages shows every name that can be disabled."
     echo "      --ffmpeg-version=VERSION   Build this FFmpeg release instead of the pinned $FFMPEG_VERSION."
-    echo "                                 VERSION is a release number (e.g. 9.0.1), \"latest\","
+    echo "                                 VERSION is a release number (e.g. 9.0.2), \"latest\","
     echo "                                 or \"snapshot\" for the current FFmpeg master."
     echo "                                 Release versions are looked up at https://ffmpeg.org/releases/."
     echo "                                 Only the pinned version is verified against a checksum"
@@ -87,7 +87,7 @@ while (($# > 0)); do
 
         if [ "$FFMPEG_VERSION_REQUEST" != "snapshot" ] &&
             [[ ! "$FFMPEG_VERSION_REQUEST" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-            echo "Error: --ffmpeg-version accepts a release number such as 9.0.1, \"latest\" or \"snapshot\", not \"$FFMPEG_VERSION_REQUEST\"."
+            echo "Error: --ffmpeg-version accepts a release number such as 9.0.2, \"latest\" or \"snapshot\", not \"$FFMPEG_VERSION_REQUEST\"."
             exit 1
         fi
 
